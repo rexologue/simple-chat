@@ -1,0 +1,16 @@
+FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir "vllm>=0.10.0"
+
+WORKDIR /app
+EXPOSE 8000
+
+ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+CMD [
+  "--model", "/app/model",
+  "--host", "0.0.0.0",
+  "--port", "8000",
+  "--api-key", "${VLLM_API_KEY}",
+  "--max-model-len", "${VLLM_MAX_MODEL_LEN:-8192}"
+]

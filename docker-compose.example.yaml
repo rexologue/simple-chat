@@ -2,7 +2,9 @@ version: "3.9"
 
 services:
   vllm:
-    image: vllm/vllm-openai:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.vllm
     command: [
       "--model", "/app/model",
       "--host", "0.0.0.0",
