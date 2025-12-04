@@ -14,9 +14,7 @@ from openai import OpenAI
 
 
 class Settings(BaseModel):
-    gateway_auth_token: str = Field(default="CHANGE_ME", alias="GATEWAY_AUTH_TOKEN")
     vllm_base_url: str = Field(default="http://vllm:8000/v1", alias="VLLM_BASE_URL")
-    vllm_api_key: str = Field(default="INTERNAL_VLLM_KEY", alias="VLLM_API_KEY")
     vllm_model_name: str = Field(default="/app/model", alias="VLLM_MODEL_NAME")
     max_context_tokens: int = Field(default=8000, alias="MAX_CONTEXT_TOKENS")
     session_ttl_seconds: int = Field(default=600, alias="SESSION_TTL_SECONDS")
@@ -27,23 +25,18 @@ class Settings(BaseModel):
 
 
 settings = Settings(**{k: v for k, v in os.environ.items() if k in {
-    "GATEWAY_AUTH_TOKEN",
     "VLLM_BASE_URL",
-    "VLLM_API_KEY",
     "VLLM_MODEL_NAME",
     "MAX_CONTEXT_TOKENS",
     "SESSION_TTL_SECONDS",
 }})
 
 
-llm_client = OpenAI(api_key=settings.vllm_api_key, base_url=settings.vllm_base_url)
-
-
 tokenizer = AutoTokenizer.from_pretrained(settings.vllm_model_name)
 
 
 class InitSessionRequest(BaseModel):
-    token: str = Field(description="Public token provided to end-users")
+    vllm_api_key: str = Field(description="API key that will be used to access vLLM")
 
 
 class InitSessionResponse(BaseModel):
@@ -85,6 +78,7 @@ class SessionData(BaseModel):
     system_prompt: str
     history: List[ChatMessageInternal]
     last_activity: datetime
+    vllm_api_key: str
 
 
 sessions: Dict[str, SessionData] = {}
@@ -127,6 +121,7 @@ async def trim_history_to_fit(
             system_prompt=session.system_prompt,
             history=history,
             last_activity=session.last_activity,
+            vllm_api_key=session.vllm_api_key,
         )
         messages = build_messages_for_model(candidate_session, new_user_message)
         input_tokens = estimate_tokens(messages)
@@ -153,9 +148,16 @@ async def get_session_or_404(session_id: str) -> SessionData:
         return session
 
 
-def validate_token(token: str) -> None:
-    if token != settings.gateway_auth_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+def ensure_valid_vllm_api_key(api_key: str) -> None:
+    client = OpenAI(api_key=api_key, base_url=settings.vllm_base_url)
+
+    try:
+        client.models.list()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid VLLM_API_KEY: vLLM denied access",
+        ) from exc
 
 
 app = FastAPI(title="Qwen Session Gateway")
@@ -171,13 +173,14 @@ app.add_middleware(
 
 @app.post("/init_session", response_model=InitSessionResponse)
 async def init_session(request: InitSessionRequest):
-    validate_token(request.token)
+    ensure_valid_vllm_api_key(request.vllm_api_key)
 
     session_id = str(uuid.uuid4())
     session = SessionData(
         system_prompt=default_system_prompt(),
         history=[],
         last_activity=datetime.utcnow(),
+        vllm_api_key=request.vllm_api_key,
     )
 
     async with sessions_lock:
@@ -201,6 +204,8 @@ async def set_system_prompt(request: SetSystemPromptRequest):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     session = await get_session_or_404(request.session_id)
+
+    llm_client = OpenAI(api_key=session.vllm_api_key, base_url=settings.vllm_base_url)
 
     messages = await trim_history_to_fit(
         session=session,
