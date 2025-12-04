@@ -29,9 +29,7 @@ services:
   gateway:
     build: .
     environment:
-      GATEWAY_AUTH_TOKEN: ${GATEWAY_AUTH_TOKEN}
       VLLM_BASE_URL: http://vllm:8000/v1
-      VLLM_API_KEY: ${VLLM_API_KEY}
       VLLM_MODEL_NAME: /app/model
       MAX_CONTEXT_TOKENS: ${MAX_CONTEXT_TOKENS:-8000}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-600}
