@@ -1,0 +1,8 @@
+{
+  "host": "localhost",
+  "port": 8080,
+  "vllm_api_key": "INTERNAL_VLLM_KEY",
+  "max_tokens": 512,
+  "temperature": 0.4,
+  "system_prompt": "Ты полезный ассистент по ML и программированию."
+}
