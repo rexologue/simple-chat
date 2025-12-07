@@ -1,7 +1,5 @@
-version: "3.9"
-
 services:
-  vllm:
+  vllm-service:
     build:
       context: .
       dockerfile: Dockerfile.vllm
@@ -9,36 +7,37 @@ services:
       "--model", "/app/model",
       "--host", "0.0.0.0",
       "--port", "8000",
-      "--api-key", "${VLLM_API_KEY}",
-      "--max-model-len", "${VLLM_MAX_MODEL_LEN:-8192}"
+      "--api-key", "YOUR_API_KEY",
+      "--max-model-len", "8192",
+      "--gpu-memory-utilization", "0.7"
     ]
-    environment:
-      - VLLM_API_KEY=${VLLM_API_KEY}
     volumes:
-      - ./model:/app/model:ro
+      - /abs/to/your/model:/app/model:ro
     deploy:
       resources:
         reservations:
           devices:
             - capabilities: ["gpu"]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8000/v1/models"]
+      # DO NOT FORGET TO ENTER CORRECT API KEY! IT MUST BE THE SAME THAT IN 'command' BLOCK ABOVE!
+      test: ["CMD-SHELL", "wget -qO- --header=\"Authorization: Bearer BROVKINTOSH\" http://localhost:8000/v1/models >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-    # Порт не публикуем, доступен только внутри сети compose
 
   gateway:
     build: .
     environment:
-      VLLM_BASE_URL: http://vllm:8000/v1
+      VLLM_BASE_URL: http://vllm-service:8000/v1
       VLLM_MODEL_NAME: /app/model
       MAX_CONTEXT_TOKENS: ${MAX_CONTEXT_TOKENS:-8000}
-      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-600}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-6000}
     ports:
       - "8080:8080"
+    volumes:
+      - /abs/to/your/model:/app/model:ro
     depends_on:
-      vllm:
+      vllm-service:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

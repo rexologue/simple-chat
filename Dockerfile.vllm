@@ -1,14 +1,30 @@
-FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+# 1. Use an NVIDIA 'devel' image, not 'runtime'
+FROM pytorch/pytorch:2.7.0-cuda12.6-cudnn9-devel
 
+# Зеркало Yandex
+# Оно работает в разы быстрее и стабильнее внутри региона
+RUN sed -i 's/archive.ubuntu.com/mirror.yandex.ru/g' /etc/apt/sources.list && \
+    sed -i 's/security.ubuntu.com/mirror.yandex.ru/g' /etc/apt/sources.list
+
+# 2. Install Python and build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-dev \
+    build-essential \
+    wget \
+    git \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 3. Create symlink for python
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+# 4. Install vLLM
+# Note: This will take a while as it might compile dependencies
 RUN python -m pip install --no-cache-dir --upgrade pip \
-    && python -m pip install --no-cache-dir "vllm>=0.10.0"
+    && python -m pip install --no-cache-dir vllm
 
 WORKDIR /app
 EXPOSE 8000
 
 ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]
-CMD ["--model", "/app/model", \
-  "--host", "0.0.0.0", \
-  "--port", "8000", \
-  "--api-key", "${VLLM_API_KEY}", \
-  "--max-model-len", "${VLLM_MAX_MODEL_LEN:-8192}"]

@@ -14,7 +14,7 @@ from openai import OpenAI
 
 
 class Settings(BaseModel):
-    vllm_base_url: str = Field(default="http://vllm:8000/v1", alias="VLLM_BASE_URL")
+    vllm_base_url: str = Field(default="http://vllm-service:8000/v1", alias="VLLM_BASE_URL")
     vllm_model_name: str = Field(default="/app/model", alias="VLLM_MODEL_NAME")
     max_context_tokens: int = Field(default=8000, alias="MAX_CONTEXT_TOKENS")
     session_ttl_seconds: int = Field(default=600, alias="SESSION_TTL_SECONDS")
