@@ -124,28 +124,31 @@ def ask_for_system_prompt(default_prompt: Optional[str]) -> Optional[str]:
 
 def chat_loop(client: GatewayClient) -> None:
     print("Введите сообщение. /system <текст> — сменить системный промпт, /exit — выйти.")
-    while True:
-        user_input = input("Вы: ").strip()
-        if not user_input:
-            continue
-        if user_input.lower() in {"/exit", ":q", "/quit"}:
-            print("Выход из чата...")
-            break
-        if user_input.startswith("/system"):
-            _, _, new_prompt = user_input.partition(" ")
-            new_prompt = new_prompt.strip()
-            if not new_prompt:
-                print("Укажите новый системный промпт после команды /system")
+    try:
+        while True:
+            user_input = input("Вы: ").strip()
+            if not user_input:
                 continue
-            client.set_system_prompt(new_prompt)
-            print("Системный промпт обновлён.")
-            continue
-        try:
-            reply = client.chat(user_input)
-        except Exception as exc:  # noqa: BLE001
-            print(f"Ошибка во время запроса: {exc}")
-            continue
-        print(f"Модель: {reply}")
+            if user_input.lower() in {"/exit", ":q", "/quit"}:
+                print("Выход из чата...")
+                break
+            if user_input.startswith("/system"):
+                _, _, new_prompt = user_input.partition(" ")
+                new_prompt = new_prompt.strip()
+                if not new_prompt:
+                    print("Укажите новый системный промпт после команды /system")
+                    continue
+                client.set_system_prompt(new_prompt)
+                print("Системный промпт обновлён.")
+                continue
+            try:
+                reply = client.chat(user_input)
+            except Exception as exc:  # noqa: BLE001
+                print(f"Ошибка во время запроса: {exc}")
+                continue
+            print(f"Модель: {reply}")
+    except KeyboardInterrupt:
+        print("\nВыход из чата по Ctrl+C...")
 
 
 def main() -> None:
